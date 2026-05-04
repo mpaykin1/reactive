@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Реактивный бегущий человечек 3D</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --btn-bg: rgba(20, 24, 40, 0.75);
+      --btn-border: rgba(255, 255, 255, 0.2);
+      --btn-active: rgba(100, 160, 255, 0.5);
+      --btn-size: 64px;
+    }
+
+```
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body {
+  background: var(--bg);
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  width: 100vw;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Интерфейс с кнопками */
+.controls {
+  position: fixed;
+  bottom: 35px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: var(--btn-size) var(--btn-size) var(--btn-size);
+  grid-template-rows: var(--btn-size) var(--btn-size) var(--btn-size);
+  pointer-events: auto;
+}
+
+.btn {
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border-radius: 50%;
+  background: var(--btn-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 2px solid var(--btn-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: rgba(255, 255, 255, 0.9);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.btn:active,
+.btn.pressed {
+  background: var(--btn-active);
+  border-color: rgba(180, 220, 255, 0.8);
+  transform: scale(0.92);
+  box-shadow: 0 0 28px rgba(80, 160, 255, 0.6);
+}
+
+.btn svg {
+  width: 36px;
+  height: 36px;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.btn-up { grid-column: 2; grid-row: 1; }
+.btn-left { grid-column: 1; grid-row: 2; }
+.btn-right { grid-column: 3; grid-row: 2; }
+.btn-down { grid-column: 2; grid-row: 3; }
+
+.arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 20px solid white;
+  pointer-events: none;
+}
+.arrow.up { border-bottom-color: white; }
+.arrow.down { border-bottom: none; border-top: 20px solid white; }
+.arrow.left { border-bottom: none; border-left: none; border-top: 14px solid transparent; border-bottom: 14px solid transparent; border-right: 20px solid white; }
+.arrow.right { border-bottom: none; border-right: none; border-top: 14px solid transparent; border-bottom: 14px solid transparent; border-left: 20px solid white; }
+
+/* Полоски ресурсов */
+.ui-panel {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.bar-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 10, 20, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 30px;
+  padding: 5px 15px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.bar-label {
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 12px currentColor;
+  width: 20px;
+  text-align: center;
+}
+.bar-outer {
+  width: 140px;
+  height: 14px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.8);
+}
+.bar-fill {
+  height: 100%;
+  width: 100%;
+  transition: width 0.2s;
+  border-radius: 10px;
+}
+.health-fill { background: linear-gradient(90deg, #ff4d4d, #ff0044); }
+.fuel-fill { background: linear-gradient(90deg, #4da6ff, #0066ff); }
+.weapon-fill { background: linear-gradient(90deg, #ffaa00, #ff6600); }
+
+.game-over-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 64px;
+  font-weight: bold;
+  color: #ff2244;
+  text-shadow: 0 0 40px #ff0000;
+  z-index: 40;
+  display: none;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  :root { --btn-size: 56px; }
+  .controls { bottom: 25px; gap: 8px; }
+  .btn { font-size: 28px; }
+  .btn svg { width: 30px; height: 30px; }
+  .bar-outer { width: 100px; }
+}
+```
+
+  </style>
+</head>
+<body>
+  <div class="ui-panel">
+    <div class="bar-container">
+      <span class="bar-label" style="color:#ff4d4d;">L</span>
+      <div class="bar-outer"><div class="bar-fill health-fill" id="healthFill"></div></div>
+    </div>
+    <div class="bar-container">
+      <span class="bar-label" style="color:#4da6ff;">F</span>
+      <div class="bar-outer"><div class="bar-fill fuel-fill" id="fuelFill"></div></div>
+    </div>
+    <div class="bar-container">
+      <span class="bar-label" style="color:#ffaa00;">W</span>
+      <div class="bar-outer"><div class="bar-fill weapon-fill" id="weaponFill"></div></div>
+    </div>
+  </div>
+  <div class="game-over-message" id="gameOverMsg">GAME OVER</div>
+
+  <div class="controls">
+    <div class="dpad">
+      <button class="btn btn-up" id="btnUp" aria-label="Взлёт">
+        <span class="arrow up"></span>
+      </button>
+      <button class="btn btn-left" id="btnBack" aria-label="Назад">
+        <span class="arrow left"></span>
+      </button>
+      <button class="btn btn-right" id="btnForward" aria-label="Вперёд">
+        <span class="arrow right"></span>
+      </button>
+      <button class="btn btn-down" id="btnDown" aria-label="Огонь">
+        <span class="arrow down"></span>
+      </button>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ─────────────────────────────────────
+    // СЦЕНА, КАМЕРА, РЕНДЕРЕР
+    // ─────────────────────────────────────
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0a0a18, 0.00018);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 60);
+    camera.position.set(6, 3.5, 9);
+    camera.lookAt(0, 1.0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.0, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 4;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.7;
+    controls.minPolarAngle = 0.25;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.35;
+    controls.update();
+
+    // ─────────────────────────────────────
+    // ОСВЕЩЕНИЕ
+    // ─────────────────────────────────────
+    const ambientLight = new THREE.AmbientLight(0x1c1f3a, 1.6);
+    scene.add(ambientLight);
+    const hemisphereLight = new THREE.HemisphereLight(0x8899cc, 0x223344, 0.9);
+    scene.add(hemisphereLight);
+
+    const keyLight = new THREE.SpotLight(0xffeedd, 60, 25, Math.PI / 5.5, 0.3, 0.6);
+    keyLight.position.set(7, 10, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.near = 0.8;
+    keyLight.shadow.camera.far = 40;
+    keyLight.shadow.bias = -0.00015;
+    keyLight.shadow.normalBias = 0.02;
+    keyLight.shadow.radius = 1.3;
+    scene.add(keyLight);
+    scene.add(keyLight.target);
+
+    const fillLight = new THREE.SpotLight(0x8899ff, 22, 18, Math.PI / 4, 0.4, 0.8);
+    fillLight.position.set(-4.5, 5.5, -3.5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.SpotLight(0xff8866, 32, 20, Math.PI / 3.5, 0.5, 0.7);
+    rimLight.position.set(0, 2.8, -7.5);
+    rimLight.castShadow = true;
+    rimLight.shadow.mapSize.width = 1024;
+    rimLight.shadow.mapSize.height = 1024;
+    rimLight.shadow.bias = -0.0002;
+    rimLight.shadow.radius = 2.2;
+    scene.add(rimLight);
+
+    const accentLight = new THREE.PointLight(0x6644ff, 20, 8, 1.5);
+    accentLight.position.set(0, -0.4, 1.8);
+    scene.add(accentLight);
+
+    // ─────────────────────────────────────
+    // БЕСКОНЕЧНЫЙ ПЛОСКИЙ ЛАНДШАФТ
+    // ─────────────────────────────────────
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1a1a2e,
+      roughness: 0.4,
+      metalness: 0.75,
+    });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const gridHelper = new THREE.PolarGridHelper(8, 48, 24, 128, 0x222244, 0x222244);
+    gridHelper.position.y = -0.19;
+    scene.add(gridHelper);
+
+    const particlesGeom = new THREE.BufferGeometry();
+    const particlesCount = 500;
+    const particlesPositions = new Float32Array(particlesCount * 3);
+    for (let i = 0; i < particlesCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 5 + Math.random() * 9;
+      const height = (Math.random() - 0.5) * 7;
+      particlesPositions[i * 3] = Math.cos(angle) * radius;
+      particlesPositions[i * 3 + 1] = height;
+      particlesPositions[i * 3 + 2] = Math.sin(angle) * radius;
+    }
+    particlesGeom.setAttribute('position', new THREE.BufferAttribute(particlesPositions, 3));
+    const particlesMat = new THREE.PointsMaterial({
+      color: 0x8899dd,
+      size: 0.035,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.5,
+    });
+    const particles = new THREE.Points(particlesGeom, particlesMat);
+    scene.add(particles);
+
+    // ─────────────────────────────────────
+    // МАТЕРИАЛЫ ПЕРСОНАЖА
+    // ─────────────────────────────────────
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x1e1e3a, roughness: 0.28, metalness: 0.85 });
+    const accentMaterial = new THREE.MeshStandardMaterial({ color: 0xd4a44a, roughness: 0.22, metalness: 0.95 });
+    const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2a4a, roughness: 0.3, metalness: 0.9 });
+    const headMaterial = new THREE.MeshStandardMaterial({ color: 0x252540, roughness: 0.25, metalness: 0.8 });
+    const visorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00ccff,
+      roughness: 0.1,
+      metalness: 0.3,
+      emissive: 0x003344,
+      emissiveIntensity: 0.6,
+    });
+
+    function createHighPolySphere(radius, material, segments = 96) {
+      const geom = new THREE.SphereGeometry(radius, segments, segments);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function createHighPolyCylinder(radiusTop, radiusBottom, height, material, segments = 72) {
+      const geom = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments, 1, false);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function createHighPolyCapsule(radius, length, material, segments = 64) {
+      const group = new THREE.Group();
+      const cyl = createHighPolyCylinder(radius, radius, length, material, segments);
+      group.add(cyl);
+      const topSphere = createHighPolySphere(radius, material, segments);
+      topSphere.position.y = length / 2;
+      group.add(topSphere);
+      const bottomSphere = createHighPolySphere(radius, material, segments);
+      bottomSphere.position.y = -length / 2;
+      group.add(bottomSphere);
+      return group;
+    }
+
+    // ─────────────────────────────────────
+    // СБОРКА ПЕРСОНАЖА
+    // ─────────────────────────────────────
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    const character = new THREE.Group();
+    rootGroup.add(character);
+
+    const torsoGroup = new THREE.Group();
+    torsoGroup.position.y = 1.15;
+    character.add(torsoGroup);
+
+    const torsoGeom = new THREE.CylinderGeometry(0.35, 0.28, 0.95, 72, 1, false);
+    const torso = new THREE.Mesh(torsoGeom, bodyMaterial);
+    torso.castShadow = true;
+    torso.receiveShadow = true;
+    torsoGroup.add(torso);
+
+    for (let i = -1; i <= 1; i += 2) {
+      const stripeGeom = new THREE.TorusGeometry(0.36, 0.04, 32, 72);
+      const stripe = new THREE.Mesh(stripeGeom, accentMaterial);
+      stripe.rotation.x = Math.PI / 2;
+      stripe.position.y = i * 0.28;
+      stripe.castShadow = true;
+      stripe.receiveShadow = true;
+      torsoGroup.add(stripe);
+    }
+
+    const emblemGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.06, 48);
+    const emblem = new THREE.Mesh(emblemGeom, accentMaterial);
+    emblem.rotation.z = Math.PI / 2;
+    emblem.position.set(0, 0.05, 0.34);
+    emblem.castShadow = true;
+    torsoGroup.add(emblem);
+
+    const headGroup = new THREE.Group();
+    headGroup.position.y = 0.58;
+    torsoGroup.add(headGroup);
+
+    const head = createHighPolySphere(0.28, headMaterial, 96);
+    head.position.y = 0.08;
+    headGroup.add(head);
+
+    const visorGeom = new THREE.SphereGeometry(0.3, 96, 48, 0, Math.PI * 2, 0, Math.PI * 0.45);
+    const visor = new THREE.Mesh(visorGeom, visorMaterial);
+    visor.position.y = 0.05;
+    visor.position.z = 0.16;
+    visor.rotation.x = -0.25;
+    visor.castShadow = true;
+    headGroup.add(visor);
+
+    const headRingGeom = new THREE.TorusGeometry(0.29, 0.03, 32, 96);
+    const headRing = new THREE.Mesh(headRingGeom, accentMaterial);
+    headRing.position.y = -0.06;
+    headRing.castShadow = true;
+    headGroup.add(headRing);
+
+    function createShoulderJoint(side) {
+      const x = side === 'left' ? 0.42 : -0.42;
+      const group = new THREE.Group();
+      group.position.set(x, 0.32, 0);
+      torsoGroup.add(group);
+      group.add(createHighPolySphere(0.13, jointMaterial, 64));
+      const ringGeom = new THREE.TorusGeometry(0.14, 0.025, 24, 48);
+      const ring = new THREE.Mesh(ringGeom, accentMaterial);
+      ring.rotation.x = Math.PI / 2;
+      ring.castShadow = true;
+      group.add(ring);
+      return group;
+    }
+
+    const leftShoulderJoint = createShoulderJoint('left');
+    const rightShoulderJoint = createShoulderJoint('right');
+
+    function createArm(side) {
+      const armGroup = new THREE.Group();
+      const shoulderParent = side === 'left' ? leftShoulderJoint : rightShoulderJoint;
+      shoulderParent.add(armGroup);
+      const upperArm = createHighPolyCapsule(0.1, 0.5, bodyMaterial, 64);
+      upperArm.position.y = -0.3;
+      armGroup.add(upperArm);
+      const elbowGroup = new THREE.Group();
+      elbowGroup.position.y = -0.6;
+      armGroup.add(elbowGroup);
+      elbowGroup.add(createHighPolySphere(0.11, jointMaterial, 64));
+      const elbowRingGeom = new THREE.TorusGeometry(0.12, 0.02, 20, 48);
+      const elbowRing = new THREE.Mesh(elbowRingGeom, accentMaterial);
+      elbowRing.castShadow = true;
+      elbowGroup.add(elbowRing);
+      const forearm = createHighPolyCapsule(0.08, 0.45, bodyMaterial, 64);
+      forearm.position.y = -0.28;
+      elbowGroup.add(forearm);
+      const handGroup = new THREE.Group();
+      handGroup.position.y = -0.55;
+      elbowGroup.add(handGroup);
+      const hand = createHighPolySphere(0.09, jointMaterial, 56);
+      hand.position.y = -0.05;
+      handGroup.add(hand);
+      for (let i = -1; i <= 1; i++) {
+        const fingerGeom = new THREE.CapsuleGeometry(0.022, 0.08, 16, 24);
+        const finger = new THREE.Mesh(fingerGeom, accentMaterial);
+        finger.position.set(i * 0.04, -0.14, 0.03);
+        finger.rotation.x = 0.3;
+        finger.castShadow = true;
+        handGroup.add(finger);
+      }
+      return { armGroup, elbowGroup, handGroup };
+    }
+
+    const leftArm = createArm('left');
+    const rightArm = createArm('right');
+
+    function createHipJoint(side) {
+      const x = side === 'left' ? 0.2 : -0.2;
+      const group = new THREE.Group();
+      group.position.set(x, -0.5, 0.04);
+      torsoGroup.add(group);
+      group.add(createHighPolySphere(0.14, jointMaterial, 64));
+      const ringGeom = new THREE.TorusGeometry(0.15, 0.028, 24, 48);
+      const ring = new THREE.Mesh(ringGeom, accentMaterial);
+      ring.rotation.x = Math.PI / 2;
+      ring.castShadow = true;
+      group.add(ring);
+      return group;
+    }
+
+    const leftHipJoint = createHipJoint('left');
+    const rightHipJoint = createHipJoint('right');
+
+    function createLeg(side) {
+      const legGroup = new THREE.Group();
+      const hipParent = side === 'left' ? leftHipJoint : rightHipJoint;
+      hipParent.add(legGroup);
+      const thigh = createHighPolyCapsule(0.12, 0.55, bodyMaterial, 64);
+      thigh.position.y = -0.35;
+      legGroup.add(thigh);
+      const kneeGroup = new THREE.Group();
+      kneeGroup.position.y = -0.7;
+      legGroup.add(kneeGroup);
+      kneeGroup.add(createHighPolySphere(0.12, jointMaterial, 64));
+      const kneeRingGeom = new THREE.TorusGeometry(0.13, 0.025, 24, 48);
+      const kneeRing = new THREE.Mesh(kneeRingGeom, accentMaterial);
+      kneeRing.castShadow = true;
+      kneeGroup.add(kneeRing);
+      const shin = createHighPolyCapsule(0.09, 0.5, bodyMaterial, 64);
+      shin.position.y = -0.32;
+      kneeGroup.add(shin);
+      const footGroup = new THREE.Group();
+      footGroup.position.y = -0.6;
+      kneeGroup.add(footGroup);
+      const footGeom = new THREE.BoxGeometry(0.15, 0.07, 0.28, 24, 12, 24);
+      const foot = new THREE.Mesh(footGeom, jointMaterial);
+      foot.position.set(0, -0.06, 0.08);
+      foot.castShadow = true;
+      foot.receiveShadow = true;
+      footGroup.add(foot);
+      const soleGeom = new THREE.BoxGeometry(0.16, 0.03, 0.3, 24, 8, 24);
+      const sole = new THREE.Mesh(soleGeom, accentMaterial);
+      sole.position.set(0, -0.1, 0.08);
+      sole.castShadow = true;
+      sole.receiveShadow = true;
+      footGroup.add(sole);
+      return { legGroup, kneeGroup, footGroup };
+    }
+
+    const leftLeg = createLeg('left');
+    const rightLeg = createLeg('right');
+
+    // ─────────────────────────────────────
+    // РЕАКТИВНЫЙ РАНЕЦ
+    // ─────────────────────────────────────
+    const jetpackGroup = new THREE.Group();
+    jetpackGroup.position.set(0, 0.15, -0.45);
+    torsoGroup.add(jetpackGroup);
+
+    const packBodyGeom = new THREE.BoxGeometry(0.5, 0.45, 0.25, 24, 24, 24);
+    const packBody = new THREE.Mesh(packBodyGeom, bodyMaterial);
+    packBody.castShadow = true;
+    packBody.receiveShadow = true;
+    jetpackGroup.add(packBody);
+
+    const packAccentGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.5, 32);
+    const leftCyl = new THREE.Mesh(packAccentGeom, accentMaterial);
+    leftCyl.position.set(-0.18, 0, 0.08);
+    leftCyl.rotation.z = Math.PI / 2;
+    leftCyl.castShadow = true;
+    jetpackGroup.add(leftCyl);
+    const rightCyl = leftCyl.clone();
+    rightCyl.position.set(0.18, 0, 0.08);
+    jetpackGroup.add(rightCyl);
+
+    const nozzleGeom = new THREE.CylinderGeometry(0.1, 0.13, 0.2, 32);
+    const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.95 });
+    const leftNozzle = new THREE.Mesh(nozzleGeom, nozzleMat);
+    leftNozzle.position.set(-0.18, -0.32, 0.0);
+    leftNozzle.castShadow = true;
+    jetpackGroup.add(leftNozzle);
+    const rightNozzle = leftNozzle.clone();
+    rightNozzle.position.set(0.18, -0.32, 0.0);
+    jetpackGroup.add(rightNozzle);
+
+    const glowRingGeom = new THREE.TorusGeometry(0.12, 0.03, 16, 32);
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 1.2 });
+    const leftGlow = new THREE.Mesh(glowRingGeom, glowMat);
+    leftGlow.position.copy(leftNozzle.position);
+    leftGlow.position.y -= 0.1;
+    leftGlow.rotation.x = Math.PI / 2;
+    jetpackGroup.add(leftGlow);
+    const rightGlow = leftGlow.clone();
+    rightGlow.position.copy(rightNozzle.position);
+    rightGlow.position.y -= 0.1;
+    jetpackGroup.add(rightGlow);
+
+    // ─────────────────────────────────────
+    // ОРУЖИЕ (лазерные пули)
+    // ─────────────────────────────────────
+    const bullets = [];
+    const bulletGeom = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
+    bulletGeom.rotateX(Math.PI / 2);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0xff4400, emissive: 0xff2200 });
+
+    function spawnBullet() {
+      const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+      bullet.position.copy(rootGroup.position).add(new THREE.Vector3(0, 1.0, 0));
+      const dir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), state.currentRotationY);
+      bullet.userData.velocity = dir.multiplyScalar(25);
+      bullet.userData.life = 2.0;
+      scene.add(bullet);
+      bullets.push(bullet);
+    }
+
+    // ─────────────────────────────────────
+    // ВРАГИ — ЧЁРНЫЕ ШАРЫ
+    // ─────────────────────────────────────
+    const enemies = [];
+    const shards = []; // осколки после взрыва
+
+    // Материал шара — чёрный глянец с красным свечением внутри
+    const enemyMat = new THREE.MeshStandardMaterial({
+      color: 0x080808,
+      roughness: 0.12,
+      metalness: 0.95,
+      emissive: 0x330000,
+      emissiveIntensity: 0.4,
+    });
+
+    // Материал осколка — тот же, но с оранжевым горением
+    function makeShardMat() {
+      return new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 0.2,
+        metalness: 0.8,
+        emissive: new THREE.Color(1.0, 0.3, 0.0),
+        emissiveIntensity: 1.8,
+        transparent: true,
+        opacity: 1.0,
+      });
+    }
+
+    function spawnEnemy() {
+      const isBig = Math.random() < 0.4;
+      const radius = isBig ? (1.2 + Math.random() * 0.6) : (0.45 + Math.random() * 0.45);
+      const segments = isBig ? 32 : 24;
+      const geom = new THREE.SphereGeometry(radius, segments, segments);
+      const mesh = new THREE.Mesh(geom, enemyMat.clone());
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      // Позиция — далеко от персонажа, случайное направление
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 28 + Math.random() * 15;
+      mesh.position.set(
+        rootGroup.position.x + Math.cos(angle) * dist,
+        radius, // лежит на земле
+        rootGroup.position.z + Math.sin(angle) * dist
+      );
+
+      // Скорость катения к персонажу
+      const speed = isBig ? (1.5 + Math.random() * 1.2) : (2.5 + Math.random() * 2.0);
+      mesh.userData = {
+        radius,
+        isBig,
+        speed,
+        hp: isBig ? 3 : 1,
+        rollAngle: 0,
+        scratchTimer: 0,
+        scratchInterval: isBig ? (0.9 + Math.random() * 0.5) : (0.4 + Math.random() * 0.3),
+      };
+
+      scene.add(mesh);
+      enemies.push(mesh);
+    }
+
+    // Первоначальный спавн
+    for (let i = 0; i < 5; i++) spawnEnemy();
+    let enemySpawnTimer = 0;
+    const ENEMY_SPAWN_INTERVAL = 4.5;
+
+    // ── Осколки при взрыве ────────────────────────────────────────────────────
+    function spawnShards(position, radius) {
+      const count = Math.floor(8 + radius * 10);
+      for (let i = 0; i < count; i++) {
+        // Случайная форма осколка — тетраэдр / маленький многогранник
+        const size = radius * (0.1 + Math.random() * 0.25);
+        const geomType = Math.random();
+        let geom;
+        if (geomType < 0.33) geom = new THREE.TetrahedronGeometry(size);
+        else if (geomType < 0.66) geom = new THREE.OctahedronGeometry(size * 0.9);
+        else geom = new THREE.IcosahedronGeometry(size * 0.7);
+
+        const mat = makeShardMat();
+        const shard = new THREE.Mesh(geom, mat);
+        shard.position.copy(position);
+        shard.castShadow = true;
+
+        // Случайный выброс
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI;
+        const speed = 4 + Math.random() * 8;
+        shard.userData.velocity = new THREE.Vector3(
+          Math.sin(phi) * Math.cos(theta) * speed,
+          1.5 + Math.random() * 6,
+          Math.sin(phi) * Math.sin(theta) * speed
+        );
+        shard.userData.rotVel = new THREE.Vector3(
+          (Math.random() - 0.5) * 12,
+          (Math.random() - 0.5) * 12,
+          (Math.random() - 0.5) * 12
+        );
+        shard.userData.life = 1.2 + Math.random() * 0.8;
+        shard.userData.maxLife = shard.userData.life;
+
+        scene.add(shard);
+        shards.push(shard);
+      }
+    }
+
+    // ── Звуки врагов (Web Audio) ──────────────────────────────────────────────
+    function playScratchSound(position) {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+      // Металлический скрип — шум + BPF
+      const bufferSize = audioCtx.sampleRate * 0.18;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 0.5);
+      }
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+
+      const bpf = audioCtx.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.value = 900 + Math.random() * 1200;
+      bpf.Q.value = 18;
+
+      const bpf2 = audioCtx.createBiquadFilter();
+      bpf2.type = 'bandpass';
+      bpf2.frequency.value = 2400 + Math.random() * 800;
+      bpf2.Q.value = 12;
+
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+
+      src.connect(bpf); bpf.connect(bpf2); bpf2.connect(g); g.connect(audioCtx.destination);
+      src.start(t);
+    }
+
+    function playExplosionSound() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+
+      // 1. Удар — низкий бум
+      const boomBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.6, audioCtx.sampleRate);
+      const boomData = boomBuf.getChannelData(0);
+      for (let i = 0; i < boomData.length; i++) {
+        boomData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.08));
+      }
+      const boom = audioCtx.createBufferSource();
+      boom.buffer = boomBuf;
+      const boomLpf = audioCtx.createBiquadFilter();
+      boomLpf.type = 'lowpass';
+      boomLpf.frequency.value = 160;
+      const boomG = audioCtx.createGain();
+      boomG.gain.setValueAtTime(1.8, t);
+      boomG.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+      boom.connect(boomLpf); boomLpf.connect(boomG); boomG.connect(audioCtx.destination);
+      boom.start(t);
+
+      // 2. Треск осколков — шум в средних частотах
+      const crackBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.4, audioCtx.sampleRate);
+      const crackData = crackBuf.getChannelData(0);
+      for (let i = 0; i < crackData.length; i++) {
+        crackData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.04));
+      }
+      const crack = audioCtx.createBufferSource();
+      crack.buffer = crackBuf;
+      const crackBpf = audioCtx.createBiquadFilter();
+      crackBpf.type = 'bandpass';
+      crackBpf.frequency.value = 1800;
+      crackBpf.Q.value = 3;
+      const crackG = audioCtx.createGain();
+      crackG.gain.setValueAtTime(0.9, t);
+      crackG.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      crack.connect(crackBpf); crackBpf.connect(crackG); crackG.connect(audioCtx.destination);
+      crack.start(t);
+
+      // 3. Горение — шипящий шум убывающий
+      const fireBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 1.2, audioCtx.sampleRate);
+      const fireData = fireBuf.getChannelData(0);
+      for (let i = 0; i < fireData.length; i++) {
+        fireData[i] = (Math.random() * 2 - 1) * 0.3;
+      }
+      const fire = audioCtx.createBufferSource();
+      fire.buffer = fireBuf;
+      const fireBpf = audioCtx.createBiquadFilter();
+      fireBpf.type = 'highpass';
+      fireBpf.frequency.value = 3000;
+      const fireG = audioCtx.createGain();
+      fireG.gain.setValueAtTime(0.5, t + 0.05);
+      fireG.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+      fire.connect(fireBpf); fireBpf.connect(fireG); fireG.connect(audioCtx.destination);
+      fire.start(t + 0.05);
+
+      // 4. Металлический звон — несколько тонов
+      [320, 610, 980, 1450].forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const oscG = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        oscG.gain.setValueAtTime(0.0, t);
+        oscG.gain.linearRampToValueAtTime(0.18, t + 0.01);
+        oscG.gain.exponentialRampToValueAtTime(0.001, t + 0.5 + idx * 0.08);
+        osc.connect(oscG); oscG.connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + 0.7);
+      });
+    }
+
+    // ── Урон персонажу от шара ────────────────────────────────────────────────
+    function enemyHitPlayer() {
+      health = Math.max(0, health - 18);
+      if (!audioCtx) return;
+      // Тревожный диссонанс при получении урона
+      const t = audioCtx.currentTime;
+      [NOTE.Eb4, NOTE.A4].forEach(f => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sawtooth'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.12, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t); o.stop(t + 0.45);
+      });
+    }
+
+    // ─────────────────────────────────────
+    // СИСТЕМА ЧАСТИЦ РАНЦА
+    // ─────────────────────────────────────
+    const maxParticles = 300;
+    const particlePool = [];
+    const particleGeometry = new THREE.BufferGeometry();
+    const particlePositionsArray = new Float32Array(maxParticles * 3);
+    const particleColorsArray = new Float32Array(maxParticles * 3);
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositionsArray, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColorsArray, 3));
+
+    const particleTexture = (() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(16, 16, 14, 0, 2 * Math.PI);
+      ctx.fill();
+      const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 14);
+      gradient.addColorStop(0, 'rgba(255,200,100,1)');
+      gradient.addColorStop(0.6, 'rgba(255,100,20,1)');
+      gradient.addColorStop(1, 'rgba(255,50,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      return new THREE.CanvasTexture(canvas);
+    })();
+
+    const particleMaterial = new THREE.PointsMaterial({
+      size: 0.25,
+      map: particleTexture,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      vertexColors: true,
+      transparent: true,
+    });
+
+    const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+    particleSystem.visible = false;
+    scene.add(particleSystem);
+
+    class Particle {
+      constructor() { this.reset(); }
+      reset() {
+        this.life = 0;
+        this.maxLife = 0;
+        this.position = new THREE.Vector3();
+        this.velocity = new THREE.Vector3();
+        this.color = new THREE.Color();
+      }
+      init(pos, vel, life, color) {
+        this.position.copy(pos);
+        this.velocity.copy(vel);
+        this.life = life;
+        this.maxLife = life;
+        this.color.copy(color);
+      }
+      update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) return false;
+        this.position.add(this.velocity.clone().multiplyScalar(dt));
+        this.velocity.y -= 2.5 * dt;
+        return true;
+      }
+    }
+
+    for (let i = 0; i < maxParticles; i++) particlePool.push(new Particle());
+
+    function emitParticles(origin, count, baseVelocity, lifeRange, colorStart, colorEnd) {
+      let emitted = 0;
+      for (let p of particlePool) {
+        if (p.life <= 0 && emitted < count) {
+          const vel = baseVelocity.clone().add(
+            new THREE.Vector3(
+              (Math.random() - 0.5) * 1.5,
+              -Math.random() * 3 - 2,
+              (Math.random() - 0.5) * 1.5
+            )
+          );
+          p.init(origin.clone(), vel, lifeRange[0] + Math.random() * (lifeRange[1] - lifeRange[0]), colorStart);
+          p.color.copy(colorStart).lerp(colorEnd, Math.random());
+          emitted++;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────
+    // СИЯЮЩИЕ БУКВЫ НА ПОЛЕ
+    // ─────────────────────────────────────
+    const letters = [];
+    const letterSpawnRadius = 30;
+    const letterDespawnRadius = 45;
+
+    function createLetterTexture(letter, baseColor) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, 128, 128);
+      // свечение
+      const gradient = ctx.createRadialGradient(64, 64, 20, 64, 64, 70);
+      gradient.addColorStop(0, baseColor);
+      gradient.addColorStop(0.7, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 128, 128);
+      // буква
+      ctx.font = 'bold 80px "Segoe UI", sans-serif';
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = baseColor;
+      ctx.shadowBlur = 20;
+      ctx.fillText(letter, 64, 64);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const texL = createLetterTexture('L', '#ff4d4d');
+    const texF = createLetterTexture('F', '#4da6ff');
+    const texW = createLetterTexture('W', '#ffaa00');
+
+    function createLetterSprite(type) {
+      let tex;
+      if (type === 'L') tex = texL;
+      else if (type === 'F') tex = texF;
+      else tex = texW;
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(1.2, 1.2, 1);
+      sprite.userData.type = type;
+      return sprite;
+    }
+
+    function spawnLetter() {
+      const types = ['L', 'F', 'W'];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const sprite = createLetterSprite(type);
+      // случайная позиция впереди относительно персонажа
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 8 + Math.random() * 25;
+      const offsetX = Math.cos(angle) * dist;
+      const offsetZ = Math.sin(angle) * dist;
+      sprite.position.set(
+        rootGroup.position.x + offsetX,
+        0.3 + Math.random() * 0.4,
+        rootGroup.position.z + offsetZ
+      );
+      scene.add(sprite);
+      letters.push(sprite);
+    }
+
+    // Первоначальное заполнение
+    for (let i = 0; i < 30; i++) spawnLetter();
+
+    function respawnLetter(sprite) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 8 + Math.random() * 25;
+      sprite.position.set(
+        rootGroup.position.x + Math.cos(angle) * dist,
+        0.3 + Math.random() * 0.4,
+        rootGroup.position.z + Math.sin(angle) * dist
+      );
+    }
+
+    // ─────────────────────────────────────
+    // РЕСУРСЫ И СОСТОЯНИЕ
+    // ─────────────────────────────────────
+    const state = {
+      forward: false,
+      backward: false,
+      up: false,
+      down: false,
+      shooting: false,
+      velocity: new THREE.Vector3(0, 0, 0),
+      targetRotationY: 0,
+      currentRotationY: 0,
+      onGround: true,
+    };
+
+    let health = 100;
+    let fuel = 100;
+    let weapon = 100;
+    let lastFireTime = 0;
+    const FIRE_RATE = 0.18;
+    let gameOver = false;
+
+    const GRAVITY = 14.0;
+    const JET_FORCE = 22.0;
+    const FALL_ACCEL = 25.0;
+    const RUN_ACCEL = 14.0;
+    const MAX_RUN_SPEED = 7.5;
+    const FRICTION = 5.5;
+    const ROTATION_SPEED = 7.0;
+
+    // UI элементы
+    const healthFill = document.getElementById('healthFill');
+    const fuelFill = document.getElementById('fuelFill');
+    const weaponFill = document.getElementById('weaponFill');
+    const gameOverMsg = document.getElementById('gameOverMsg');
+
+    // Кнопки
+    const btnForward = document.getElementById('btnForward');
+    const btnBack = document.getElementById('btnBack');
+    const btnUp = document.getElementById('btnUp');
+    const btnDown = document.getElementById('btnDown');
+
+    function setButtonState(btn, pressed) {
+      btn.classList.toggle('pressed', pressed);
+    }
+
+    btnForward.addEventListener('pointerdown', (e) => { e.preventDefault(); state.forward = true; setButtonState(btnForward, true); });
+    btnForward.addEventListener('pointerup', (e) => { e.preventDefault(); state.forward = false; setButtonState(btnForward, false); });
+    btnForward.addEventListener('pointerleave', (e) => { state.forward = false; setButtonState(btnForward, false); });
+
+    btnBack.addEventListener('pointerdown', (e) => { e.preventDefault(); state.backward = true; setButtonState(btnBack, true); });
+    btnBack.addEventListener('pointerup', (e) => { e.preventDefault(); state.backward = false; setButtonState(btnBack, false); });
+    btnBack.addEventListener('pointerleave', (e) => { state.backward = false; setButtonState(btnBack, false); });
+
+    btnUp.addEventListener('pointerdown', (e) => { e.preventDefault(); state.up = true; setButtonState(btnUp, true); });
+    btnUp.addEventListener('pointerup', (e) => { e.preventDefault(); state.up = false; setButtonState(btnUp, false); });
+    btnUp.addEventListener('pointerleave', (e) => { state.up = false; setButtonState(btnUp, false); });
+
+    // Кнопка вниз теперь стрельба
+    btnDown.addEventListener('pointerdown', (e) => { e.preventDefault(); state.shooting = true; setButtonState(btnDown, true); });
+    btnDown.addEventListener('pointerup', (e) => { e.preventDefault(); state.shooting = false; setButtonState(btnDown, false); });
+    btnDown.addEventListener('pointerleave', (e) => { state.shooting = false; setButtonState(btnDown, false); });
+
+    [btnForward, btnBack, btnUp, btnDown].forEach(b => {
+      b.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+      b.addEventListener('touchend', (e) => e.preventDefault());
+      b.addEventListener('touchcancel', (e) => e.preventDefault());
+    });
+
+    function updateUI() {
+      healthFill.style.width = Math.max(0, health) + '%';
+      fuelFill.style.width = Math.max(0, fuel) + '%';
+      weaponFill.style.width = Math.max(0, weapon) + '%';
+    }
+
+    // ─────────────────────────────────────
+    // АНИМАЦИОННЫЙ ЦИКЛ
+    // ─────────────────────────────────────
+    const clock = new THREE.Clock();
+
+    function animate() {
+      if (gameOver) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const now = performance.now() * 0.001;
+
+      // Расход ресурсов
+      health -= 2 * dt;
+      if (health <= 0) {
+        health = 0;
+        gameOver = true;
+        gameOverMsg.style.display = 'block';
+        updateUI();
+        return;
+      }
+
+      // Топливо расходуется только при активном полёте (up)
+      if (state.up) {
+        if (fuel > 0) {
+          fuel -= 15 * dt;
+          if (fuel < 0) fuel = 0;
+        }
+      }
+
+      // Стрельба
+      if (state.shooting && weapon > 0 && now - lastFireTime > FIRE_RATE) {
+        spawnBullet();
+        weapon -= 5;
+        if (weapon < 0) weapon = 0;
+        lastFireTime = now;
+      }
+
+      updateUI();
+
+      // Физика движения
+      const { velocity, forward, backward, up, down } = state;
+
+      let moveDir = 0;
+      if (forward && !backward) moveDir = 1;
+      else if (backward && !forward) moveDir = -1;
+
+      if (moveDir === 1) state.targetRotationY = 0;
+      else if (moveDir === -1) state.targetRotationY = Math.PI;
+
+      let angleDiff = state.targetRotationY - state.currentRotationY;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      const maxRotStep = ROTATION_SPEED * dt;
+      state.currentRotationY += Math.abs(angleDiff) < maxRotStep ? angleDiff : Math.sign(angleDiff) * maxRotStep;
+      rootGroup.rotation.y = state.currentRotationY;
+
+      const forwardDir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), state.currentRotationY);
+
+      const horizontalSpeed = new THREE.Vector2(velocity.x, velocity.z).length();
+      if (moveDir !== 0 && state.onGround) {
+        const accel = forwardDir.clone().multiplyScalar(RUN_ACCEL * dt);
+        velocity.x += accel.x;
+        velocity.z += accel.z;
+        if (horizontalSpeed > MAX_RUN_SPEED) {
+          const scale = MAX_RUN_SPEED / horizontalSpeed;
+          velocity.x *= scale;
+          velocity.z *= scale;
+        }
+      } else if (moveDir === 0 && state.onGround) {
+        if (horizontalSpeed > 0.01) {
+          const frictionAmount = FRICTION * dt;
+          const newSpeed = Math.max(0, horizontalSpeed - frictionAmount);
+          if (horizontalSpeed > 0) {
+            velocity.x *= newSpeed / horizontalSpeed;
+            velocity.z *= newSpeed / horizontalSpeed;
+          }
+        } else {
+          velocity.x = 0;
+          velocity.z = 0;
+        }
+      }
+
+      // Вертикальная физика (полёт только если есть топливо)
+      if (!state.onGround) {
+        if (up && fuel > 0) {
+          velocity.y += JET_FORCE * dt;
+        }
+        // down больше не ускоряет падение, убрано
+        velocity.y -= GRAVITY * dt;
+      } else {
+        if (up && fuel > 0 && state.onGround) {
+          velocity.y = JET_FORCE * dt;
+          state.onGround = false;
+        }
+      }
+
+      rootGroup.position.x += velocity.x * dt;
+      rootGroup.position.y += velocity.y * dt;
+      rootGroup.position.z += velocity.z * dt;
+
+      if (rootGroup.position.y <= 0 && !state.onGround) {
+        rootGroup.position.y = 0;
+        velocity.y = 0;
+        state.onGround = true;
+      } else if (rootGroup.position.y > 0.01 && state.onGround) {
+        state.onGround = false;
+      }
+
+      // Бесконечный ландшафт следует за персонажем
+      floor.position.x = rootGroup.position.x;
+      floor.position.z = rootGroup.position.z;
+      gridHelper.position.x = rootGroup.position.x;
+      gridHelper.position.z = rootGroup.position.z;
+
+      // Свет следует за персонажем
+      const lightOffset = new THREE.Vector3(7, 10, 5);
+      keyLight.position.copy(rootGroup.position).add(lightOffset);
+      keyLight.target.position.copy(rootGroup.position);
+
+      // Обновление букв и сбор
+      for (let i = letters.length - 1; i >= 0; i--) {
+        const sprite = letters[i];
+        const dist = sprite.position.distanceTo(rootGroup.position);
+        if (dist < 1.0) {
+          // сбор
+          const type = sprite.userData.type;
+          if (type === 'L') health = Math.min(100, health + 30);
+          else if (type === 'F') fuel = Math.min(100, fuel + 30);
+          else if (type === 'W') weapon = Math.min(100, weapon + 25);
+          respawnLetter(sprite); // перемещаем вместо удаления
+        } else if (dist > letterDespawnRadius) {
+          respawnLetter(sprite);
+        }
+        // небольшая анимация парения
+        sprite.position.y = 0.45 + Math.sin(now * 5 + i) * 0.1;
+        sprite.material.opacity = 0.7 + Math.sin(now * 3 + i) * 0.2;
+      }
+
+      // Обновление пуль + столкновение с врагами
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        bullet.position.add(bullet.userData.velocity.clone().multiplyScalar(dt));
+        bullet.userData.life -= dt;
+
+        let bulletRemoved = false;
+        if (bullet.userData.life <= 0 || bullet.position.distanceTo(rootGroup.position) > 80) {
+          scene.remove(bullet);
+          bullets.splice(i, 1);
+          bulletRemoved = true;
+        }
+
+        if (!bulletRemoved) {
+          // Проверяем попадание в каждого врага
+          for (let j = enemies.length - 1; j >= 0; j--) {
+            const enemy = enemies[j];
+            const dist = bullet.position.distanceTo(enemy.position);
+            if (dist < enemy.userData.radius + 0.15) {
+              enemy.userData.hp--;
+              // Попадание — вспышка красного свечения
+              enemy.material.emissive.set(0xff2200);
+              enemy.material.emissiveIntensity = 2.5;
+              setTimeout(() => {
+                if (enemy.material) {
+                  enemy.material.emissive.set(0x330000);
+                  enemy.material.emissiveIntensity = 0.4;
+                }
+              }, 80);
+
+              // Удаляем пулю
+              scene.remove(bullet);
+              bullets.splice(i, 1);
+              bulletRemoved = true;
+
+              if (enemy.userData.hp <= 0) {
+                // Взрыв!
+                spawnShards(enemy.position.clone(), enemy.userData.radius);
+                playExplosionSound();
+                scene.remove(enemy);
+                enemies.splice(j, 1);
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // Обновление врагов
+      enemySpawnTimer += dt;
+      if (enemySpawnTimer >= ENEMY_SPAWN_INTERVAL) {
+        enemySpawnTimer = 0;
+        spawnEnemy();
+      }
+
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+        const ud = enemy.userData;
+
+        // Направление к персонажу
+        const toPlayer = new THREE.Vector3()
+          .subVectors(rootGroup.position, enemy.position);
+        toPlayer.y = 0;
+        const distToPlayer = toPlayer.length();
+
+        if (distToPlayer > 0.1) {
+          toPlayer.normalize();
+          enemy.position.addScaledVector(toPlayer, ud.speed * dt);
+
+          // Вращение шара при качении
+          const rollAxis = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
+          const rollAmount = (ud.speed * dt) / ud.radius;
+          ud.rollAngle += rollAmount;
+          enemy.setRotationFromAxisAngle(rollAxis, ud.rollAngle);
+        }
+
+        // Удерживаем на земле
+        enemy.position.y = ud.radius;
+
+        // Скрип при качении
+        ud.scratchTimer += dt;
+        if (ud.scratchTimer >= ud.scratchInterval) {
+          ud.scratchTimer = 0;
+          if (distToPlayer < 40) playScratchSound(enemy.position);
+        }
+
+        // Столкновение с персонажем
+        if (distToPlayer < ud.radius + 0.55) {
+          enemyHitPlayer();
+          // Отталкиваем шар назад
+          const away = toPlayer.clone().negate().multiplyScalar(ud.radius + 1.5);
+          enemy.position.add(away);
+        }
+
+        // Если ушёл слишком далеко — телепортируем ближе
+        if (distToPlayer > 80) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 28 + Math.random() * 10;
+          enemy.position.set(
+            rootGroup.position.x + Math.cos(angle) * dist,
+            ud.radius,
+            rootGroup.position.z + Math.sin(angle) * dist
+          );
+        }
+      }
+
+      // Обновление осколков
+      for (let i = shards.length - 1; i >= 0; i--) {
+        const shard = shards[i];
+        const sd = shard.userData;
+        sd.life -= dt;
+        if (sd.life <= 0) {
+          scene.remove(shard);
+          shard.geometry.dispose();
+          shard.material.dispose();
+          shards.splice(i, 1);
+          continue;
+        }
+        // Физика осколка
+        sd.velocity.y -= 9.0 * dt;
+        shard.position.addScaledVector(sd.velocity, dt);
+        if (shard.position.y < 0.05) {
+          shard.position.y = 0.05;
+          sd.velocity.y *= -0.25;
+          sd.velocity.x *= 0.7;
+          sd.velocity.z *= 0.7;
+        }
+        shard.rotation.x += sd.rotVel.x * dt;
+        shard.rotation.y += sd.rotVel.y * dt;
+        shard.rotation.z += sd.rotVel.z * dt;
+        // Угасание свечения и прозрачность
+        const frac = sd.life / sd.maxLife;
+        shard.material.emissiveIntensity = frac * 2.2;
+        shard.material.emissive.setRGB(1.0, frac * 0.35, 0.0);
+        shard.material.opacity = Math.min(1, frac * 2);
+      }
+
+      // Анимация бега
+      const runCycleSpeed = state.onGround ? horizontalSpeed * 1.2 : 0;
+      const cycle = performance.now() * 0.001 * runCycleSpeed;
+      const sinCycle = Math.sin(cycle);
+      const absSin = Math.abs(sinCycle);
+
+      const maxHipSwing = state.onGround ? 0.75 : 0.3;
+      const maxShoulderSwing = state.onGround ? 0.6 : 0.2;
+      const maxKneeBend = state.onGround ? 0.8 : 0.2;
+      const maxElbowBend = state.onGround ? 0.65 : 0.15;
+      const bounceHeight = state.onGround ? 0.12 : 0.02;
+
+      leftHipJoint.rotation.x = Math.sin(cycle) * maxHipSwing;
+      rightHipJoint.rotation.x = Math.sin(cycle + Math.PI) * maxHipSwing;
+      leftLeg.kneeGroup.rotation.x = Math.max(0, Math.sin(cycle + Math.PI / 2)) * maxKneeBend;
+      rightLeg.kneeGroup.rotation.x = Math.max(0, Math.sin(cycle + Math.PI + Math.PI / 2)) * maxKneeBend;
+      leftShoulderJoint.rotation.x = Math.sin(cycle + Math.PI) * maxShoulderSwing;
+      rightShoulderJoint.rotation.x = Math.sin(cycle) * maxShoulderSwing;
+      leftArm.elbowGroup.rotation.x = Math.max(0, Math.sin(cycle - Math.PI / 2)) * maxElbowBend;
+      rightArm.elbowGroup.rotation.x = Math.max(0, Math.sin(cycle + Math.PI - Math.PI / 2)) * maxElbowBend;
+
+      const bodyBounce = state.onGround ? Math.abs(Math.sin(cycle * 2)) * bounceHeight : 0;
+      character.position.y = bodyBounce;
+      torsoGroup.rotation.x = state.onGround ? (0.12 + absSin * 0.05) : 0.04;
+      headGroup.rotation.z = state.onGround ? -sinCycle * 0.04 : 0;
+      headGroup.rotation.x = state.onGround ? -0.06 - absSin * 0.04 : -0.02;
+
+      // Частицы ранца
+      const jetActive = state.up && fuel > 0 && (state.onGround || !state.onGround);
+      particleSystem.visible = jetActive;
+      if (jetActive) {
+        const leftWorldPos = leftNozzle.getWorldPosition(new THREE.Vector3());
+        const rightWorldPos = rightNozzle.getWorldPosition(new THREE.Vector3());
+        emitParticles(leftWorldPos, 8, new THREE.Vector3(0, -5, 0), [0.4, 0.9], new THREE.Color(1, 0.5, 0), new THREE.Color(0.2, 0.2, 0.2));
+        emitParticles(rightWorldPos, 8, new THREE.Vector3(0, -5, 0), [0.4, 0.9], new THREE.Color(1, 0.5, 0), new THREE.Color(0.2, 0.2, 0.2));
+      }
+
+      let activeIndex = 0;
+      for (let p of particlePool) {
+        if (p.life > 0) {
+          p.update(dt);
+          if (p.life > 0 && activeIndex < maxParticles) {
+            particlePositionsArray[activeIndex * 3] = p.position.x;
+            particlePositionsArray[activeIndex * 3 + 1] = p.position.y;
+            particlePositionsArray[activeIndex * 3 + 2] = p.position.z;
+            particleColorsArray[activeIndex * 3] = p.color.r;
+            particleColorsArray[activeIndex * 3 + 1] = p.color.g;
+            particleColorsArray[activeIndex * 3 + 2] = p.color.b;
+            activeIndex++;
+          }
+        }
+      }
+      for (let i = activeIndex; i < maxParticles; i++) {
+        particlePositionsArray[i * 3] = 0;
+        particlePositionsArray[i * 3 + 1] = -999;
+        particlePositionsArray[i * 3 + 2] = 0;
+        particleColorsArray[i * 3] = 0;
+        particleColorsArray[i * 3 + 1] = 0;
+        particleColorsArray[i * 3 + 2] = 0;
+      }
+      particleGeometry.attributes.position.needsUpdate = true;
+      particleGeometry.attributes.color.needsUpdate = true;
+
+      particles.rotation.y += dt * 0.07;
+      particles.rotation.x += dt * 0.02;
+
+      // Звук
+      updateSound(now, dt);
+
+      controls.target.copy(rootGroup.position).add(new THREE.Vector3(0, 1.0, 0));
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // ─────────────────────────────────────
+    // ЗВУКОВАЯ СИСТЕМА — ГАРМОНИЧНЫЕ АККОРДЫ
+    // ─────────────────────────────────────
+    let audioCtx = null;
+    let soundEnabled = false;
+    let lastChordTime = 0;
+    let currentMood = 'neutral';
+    let moodTimer = 0;
+    let moodDuration = 0;
+
+    // Все частоты нот (равномерная темперация, октавы 3-5)
+    const NOTE = {
+      C3:130.81, Db3:138.59, D3:146.83, Eb3:155.56, E3:164.81, F3:174.61,
+      Gb3:185.00, G3:196.00, Ab3:207.65, A3:220.00, Bb3:233.08, B3:246.94,
+      C4:261.63, Db4:277.18, D4:293.66, Eb4:311.13, E4:329.63, F4:349.23,
+      Gb4:369.99, G4:392.00, Ab4:415.30, A4:440.00, Bb4:466.16, B4:493.88,
+      C5:523.25, Db5:554.37, D5:587.33, Eb5:622.25, E5:659.25, F5:698.46,
+      Gb5:739.99, G5:783.99, Ab5:830.61, A5:880.00, Bb5:932.33, B5:987.77,
+      C6:1046.50
+    };
+
+    // ── Библиотека аккордов по характеру ──────────────────────────────────────
+    // Каждый аккорд: { name, notes: [], type, mood }
+    // type: duet(2), triad(3), tetrad(4), pentatonic(5), extended(6+)
+    // mood: sad, tense, happy, tender, scary, epic, mystery, calm
+
+    const CHORD_LIBRARY = {
+
+      // ══ ГРУСТНЫЕ (minor, dim, sus) ═══════════════════════
+      sad: [
+        // 2-звучные
+        { name: 'A min dyad',    notes: [NOTE.A3, NOTE.E4],                              type: 'duet'  },
+        { name: 'E min dyad',    notes: [NOTE.E3, NOTE.B3],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'A minor',       notes: [NOTE.A3, NOTE.C4, NOTE.E4],                     type: 'triad' },
+        { name: 'D minor',       notes: [NOTE.D3, NOTE.F3, NOTE.A3],                     type: 'triad' },
+        { name: 'E minor',       notes: [NOTE.E3, NOTE.G3, NOTE.B3],                     type: 'triad' },
+        { name: 'G minor',       notes: [NOTE.G3, NOTE.Bb3, NOTE.D4],                    type: 'triad' },
+        { name: 'C minor',       notes: [NOTE.C4, NOTE.Eb4, NOTE.G4],                    type: 'triad' },
+        // 4-звучные
+        { name: 'A min 7',       notes: [NOTE.A3, NOTE.C4, NOTE.E4, NOTE.G4],            type: 'tetrad'},
+        { name: 'D min 7',       notes: [NOTE.D3, NOTE.F3, NOTE.A3, NOTE.C4],            type: 'tetrad'},
+        { name: 'E min 7',       notes: [NOTE.E3, NOTE.G3, NOTE.B3, NOTE.D4],            type: 'tetrad'},
+        { name: 'Am add9',       notes: [NOTE.A3, NOTE.C4, NOTE.E4, NOTE.B4],            type: 'tetrad'},
+        // 5-звучные
+        { name: 'Am9',           notes: [NOTE.A3, NOTE.C4, NOTE.E4, NOTE.G4, NOTE.B4],  type: 'pentatonic'},
+        { name: 'Dm9',           notes: [NOTE.D3, NOTE.F3, NOTE.A3, NOTE.C4, NOTE.E4],  type: 'pentatonic'},
+        // 6-звучные
+        { name: 'Am11',          notes: [NOTE.A3,NOTE.C4,NOTE.E4,NOTE.G4,NOTE.B4,NOTE.D5], type: 'extended'},
+      ],
+
+      // ══ ТРЕВОЖНЫЕ (dim, aug, tritone, clusters) ═══════════
+      tense: [
+        // 2-звучные — тритон
+        { name: 'Tritone C-Gb',  notes: [NOTE.C4, NOTE.Gb4],                             type: 'duet'  },
+        { name: 'Tritone G-Db',  notes: [NOTE.G3, NOTE.Db4],                             type: 'duet'  },
+        // 3-звучные
+        { name: 'B dim',         notes: [NOTE.B3, NOTE.D4, NOTE.F4],                     type: 'triad' },
+        { name: 'F# dim',        notes: [NOTE.Gb3, NOTE.A3, NOTE.C4],                    type: 'triad' },
+        { name: 'C dim',         notes: [NOTE.C4, NOTE.Eb4, NOTE.Gb4],                   type: 'triad' },
+        { name: 'D dim',         notes: [NOTE.D4, NOTE.F4, NOTE.Ab4],                    type: 'triad' },
+        // 4-звучные
+        { name: 'Bdim7',         notes: [NOTE.B3, NOTE.D4, NOTE.F4, NOTE.Ab4],           type: 'tetrad'},
+        { name: 'Cdim7',         notes: [NOTE.C4, NOTE.Eb4, NOTE.Gb4, NOTE.A4],          type: 'tetrad'},
+        { name: 'C aug7',        notes: [NOTE.C4, NOTE.E4, NOTE.Ab4, NOTE.Bb4],          type: 'tetrad'},
+        { name: 'Phrygian 4',    notes: [NOTE.E3, NOTE.F3, NOTE.G3, NOTE.B3],            type: 'tetrad'},
+        // 5-звучные
+        { name: 'Dim cluster',   notes: [NOTE.B3,NOTE.D4,NOTE.F4,NOTE.Ab4,NOTE.B4],     type: 'pentatonic'},
+        // 6-звучные
+        { name: 'Dark cluster',  notes: [NOTE.C4,NOTE.Db4,NOTE.Eb4,NOTE.Gb4,NOTE.Ab4,NOTE.Bb4], type: 'extended'},
+      ],
+
+      // ══ ВЕСЁЛЫЕ (major, 6th, mixolydian) ═══════════════════
+      happy: [
+        // 2-звучные
+        { name: 'C-E dyad',      notes: [NOTE.C4, NOTE.E4],                              type: 'duet'  },
+        { name: 'G-B dyad',      notes: [NOTE.G3, NOTE.B3],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'C major',       notes: [NOTE.C4, NOTE.E4, NOTE.G4],                     type: 'triad' },
+        { name: 'G major',       notes: [NOTE.G3, NOTE.B3, NOTE.D4],                     type: 'triad' },
+        { name: 'F major',       notes: [NOTE.F3, NOTE.A3, NOTE.C4],                     type: 'triad' },
+        { name: 'D major',       notes: [NOTE.D4, NOTE.Gb4, NOTE.A4],                    type: 'triad' },
+        { name: 'A major',       notes: [NOTE.A3, NOTE.Db4, NOTE.E4],                    type: 'triad' },
+        // 4-звучные
+        { name: 'C maj7',        notes: [NOTE.C4, NOTE.E4, NOTE.G4, NOTE.B4],            type: 'tetrad'},
+        { name: 'G maj7',        notes: [NOTE.G3, NOTE.B3, NOTE.D4, NOTE.Gb4],           type: 'tetrad'},
+        { name: 'D7',            notes: [NOTE.D4, NOTE.Gb4, NOTE.A4, NOTE.C5],           type: 'tetrad'},
+        { name: 'C6',            notes: [NOTE.C4, NOTE.E4, NOTE.G4, NOTE.A4],            type: 'tetrad'},
+        // 5-звучные
+        { name: 'Cmaj9',         notes: [NOTE.C4, NOTE.E4, NOTE.G4, NOTE.B4, NOTE.D5],  type: 'pentatonic'},
+        { name: 'G9',            notes: [NOTE.G3, NOTE.B3, NOTE.D4, NOTE.F4, NOTE.A4],  type: 'pentatonic'},
+        // 6-звучные
+        { name: 'C maj13',       notes: [NOTE.C4,NOTE.E4,NOTE.G4,NOTE.B4,NOTE.D5,NOTE.A5], type: 'extended'},
+      ],
+
+      // ══ НЕЖНЫЕ (major 7, 9, sus2, lydian) ═══════════════════
+      tender: [
+        // 2-звучные
+        { name: 'E-B dyad',      notes: [NOTE.E4, NOTE.B4],                              type: 'duet'  },
+        { name: 'A-E dyad',      notes: [NOTE.A4, NOTE.E5],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'Dsus2',         notes: [NOTE.D4, NOTE.E4, NOTE.A4],                     type: 'triad' },
+        { name: 'Asus2',         notes: [NOTE.A3, NOTE.B3, NOTE.E4],                     type: 'triad' },
+        { name: 'Gsus2',         notes: [NOTE.G4, NOTE.A4, NOTE.D5],                     type: 'triad' },
+        { name: 'Esus4',         notes: [NOTE.E4, NOTE.A4, NOTE.B4],                     type: 'triad' },
+        // 4-звучные
+        { name: 'Amaj7',         notes: [NOTE.A3, NOTE.Db4, NOTE.E4, NOTE.Ab4],          type: 'tetrad'},
+        { name: 'Emaj7',         notes: [NOTE.E4, NOTE.Ab4, NOTE.B4, NOTE.Eb5],          type: 'tetrad'},
+        { name: 'Dmaj7',         notes: [NOTE.D4, NOTE.Gb4, NOTE.A4, NOTE.Db5],          type: 'tetrad'},
+        { name: 'F Lydian 4',    notes: [NOTE.F4, NOTE.A4, NOTE.B4, NOTE.C5],            type: 'tetrad'},
+        // 5-звучные
+        { name: 'Amaj9',         notes: [NOTE.A3, NOTE.Db4, NOTE.E4, NOTE.Ab4, NOTE.B4],type: 'pentatonic'},
+        { name: 'Emaj9',         notes: [NOTE.E4, NOTE.Ab4, NOTE.B4, NOTE.Eb5, NOTE.Gb5],type:'pentatonic'},
+        // 6-звучные
+        { name: 'Amaj13',        notes: [NOTE.A3,NOTE.Db4,NOTE.E4,NOTE.Ab4,NOTE.B4,NOTE.Gb5], type:'extended'},
+      ],
+
+      // ══ СТРАШНЫЕ (phrygian, dim, chromatic, dissonance) ═════
+      scary: [
+        // 2-звучные — малая секунда
+        { name: 'Half-step C-Db',notes: [NOTE.C4, NOTE.Db4],                             type: 'duet'  },
+        { name: 'Half-step E-F', notes: [NOTE.E3, NOTE.F3],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'Phrygian 3',    notes: [NOTE.E3, NOTE.F3, NOTE.B3],                     type: 'triad' },
+        { name: 'Dark augm',     notes: [NOTE.C4, NOTE.E4, NOTE.Ab4],                    type: 'triad' },
+        { name: 'Eb aug',        notes: [NOTE.Eb4, NOTE.G4, NOTE.B4],                    type: 'triad' },
+        { name: 'G aug',         notes: [NOTE.G3, NOTE.B3, NOTE.Eb4],                    type: 'triad' },
+        // 4-звучные
+        { name: 'Horror 4',      notes: [NOTE.C4, NOTE.Db4, NOTE.Gb4, NOTE.B4],          type: 'tetrad'},
+        { name: 'Dim7 dark',     notes: [NOTE.D3, NOTE.F3, NOTE.Ab3, NOTE.B3],           type: 'tetrad'},
+        { name: 'Toxic 4th',     notes: [NOTE.E3, NOTE.F3, NOTE.Bb3, NOTE.B3],           type: 'tetrad'},
+        { name: 'Cluster4',      notes: [NOTE.C4, NOTE.Db4, NOTE.D4, NOTE.Eb4],          type: 'tetrad'},
+        // 5-звучные
+        { name: 'Phrygian dom5', notes: [NOTE.E3,NOTE.F3,NOTE.Ab3,NOTE.B3,NOTE.E4],     type: 'pentatonic'},
+        { name: 'Nightmare5',    notes: [NOTE.C4,NOTE.Db4,NOTE.Gb4,NOTE.G4,NOTE.B4],    type: 'pentatonic'},
+        // 6-звучные
+        { name: 'Cluster 6',     notes: [NOTE.B3,NOTE.C4,NOTE.Db4,NOTE.F4,NOTE.Gb4,NOTE.B4], type:'extended'},
+      ],
+
+      // ══ ЭПИЧЕСКИЕ (power, sus4, open 5th, modal) ════════════
+      epic: [
+        // 2-звучные — квинта
+        { name: 'Power C5',      notes: [NOTE.C4, NOTE.G4],                              type: 'duet'  },
+        { name: 'Power G5',      notes: [NOTE.G3, NOTE.D4],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'Csus4',         notes: [NOTE.C4, NOTE.F4, NOTE.G4],                     type: 'triad' },
+        { name: 'Gsus4',         notes: [NOTE.G3, NOTE.C4, NOTE.D4],                     type: 'triad' },
+        { name: 'Dsus4',         notes: [NOTE.D4, NOTE.G4, NOTE.A4],                     type: 'triad' },
+        { name: 'Dorian 3',      notes: [NOTE.D4, NOTE.F4, NOTE.A4],                     type: 'triad' },
+        // 4-звучные
+        { name: 'Epic Csus4 7',  notes: [NOTE.C4, NOTE.F4, NOTE.G4, NOTE.Bb4],           type: 'tetrad'},
+        { name: 'Mixolyd G',     notes: [NOTE.G3, NOTE.B3, NOTE.D4, NOTE.F4],            type: 'tetrad'},
+        { name: 'Open D modal',  notes: [NOTE.D3, NOTE.A3, NOTE.D4, NOTE.A4],            type: 'tetrad'},
+        { name: 'D Dorian 7',    notes: [NOTE.D4, NOTE.F4, NOTE.A4, NOTE.C5],            type: 'tetrad'},
+        // 5-звучные
+        { name: 'Epic 5th stack',notes: [NOTE.C3, NOTE.G3, NOTE.C4, NOTE.G4, NOTE.C5],  type: 'pentatonic'},
+        { name: 'Dorian 9',      notes: [NOTE.D4,NOTE.F4,NOTE.A4,NOTE.C5,NOTE.E5],      type: 'pentatonic'},
+        // 6-звучные
+        { name: 'Grand modal',   notes: [NOTE.C3,NOTE.G3,NOTE.C4,NOTE.E4,NOTE.G4,NOTE.B4], type:'extended'},
+      ],
+
+      // ══ ТАИНСТВЕННЫЕ (whole tone, lydian, pentatonic min) ════
+      mystery: [
+        // 2-звучные — септима
+        { name: 'Maj7 int C-B',  notes: [NOTE.C4, NOTE.B4],                              type: 'duet'  },
+        { name: 'Min7 int G-F',  notes: [NOTE.G3, NOTE.F4],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'Whole tone 3',  notes: [NOTE.C4, NOTE.D4, NOTE.E4],                     type: 'triad' },
+        { name: 'Lydian 3',      notes: [NOTE.F4, NOTE.B4, NOTE.C5],                     type: 'triad' },
+        { name: 'Enigma 3',      notes: [NOTE.C4, NOTE.Gb4, NOTE.B4],                    type: 'triad' },
+        { name: 'Whole tone Db', notes: [NOTE.Db4, NOTE.Eb4, NOTE.F4],                   type: 'triad' },
+        // 4-звучные
+        { name: 'Whole tone 4',  notes: [NOTE.C4, NOTE.D4, NOTE.E4, NOTE.Gb4],           type: 'tetrad'},
+        { name: 'Lydian 7',      notes: [NOTE.F4, NOTE.A4, NOTE.B4, NOTE.E5],            type: 'tetrad'},
+        { name: 'Pentatmin4',    notes: [NOTE.A3, NOTE.C4, NOTE.D4, NOTE.E4],            type: 'tetrad'},
+        { name: 'Enigma4',       notes: [NOTE.C4, NOTE.Db4, NOTE.E4, NOTE.Ab4],          type: 'tetrad'},
+        // 5-звучные
+        { name: 'Whole tone 5',  notes: [NOTE.C4, NOTE.D4, NOTE.E4, NOTE.Gb4, NOTE.Ab4],type: 'pentatonic'},
+        { name: 'Pent minor 5',  notes: [NOTE.A3,NOTE.C4,NOTE.D4,NOTE.E4,NOTE.G4],      type: 'pentatonic'},
+        // 6-звучные
+        { name: 'Hexatone',      notes: [NOTE.C4,NOTE.D4,NOTE.E4,NOTE.Gb4,NOTE.Ab4,NOTE.Bb4], type:'extended'},
+      ],
+
+      // ══ СПОКОЙНЫЕ (major 9, add9, open voicing) ══════════════
+      calm: [
+        // 2-звучные — секста
+        { name: 'C-A dyad',      notes: [NOTE.C4, NOTE.A4],                              type: 'duet'  },
+        { name: 'E-C dyad',      notes: [NOTE.E4, NOTE.C5],                              type: 'duet'  },
+        // 3-звучные
+        { name: 'Gadd9',         notes: [NOTE.G3, NOTE.B3, NOTE.A4],                     type: 'triad' },
+        { name: 'Cadd9',         notes: [NOTE.C4, NOTE.E4, NOTE.D5],                     type: 'triad' },
+        { name: 'Fadd9',         notes: [NOTE.F3, NOTE.A3, NOTE.G4],                     type: 'triad' },
+        { name: 'Open C',        notes: [NOTE.C3, NOTE.G3, NOTE.E4],                     type: 'triad' },
+        // 4-звучные
+        { name: 'Gadd9-4',       notes: [NOTE.G3, NOTE.D4, NOTE.G4, NOTE.A4],            type: 'tetrad'},
+        { name: 'Cmaj9 open',    notes: [NOTE.C3, NOTE.G3, NOTE.B3, NOTE.D4],            type: 'tetrad'},
+        { name: 'Fmaj9 open',    notes: [NOTE.F3, NOTE.C4, NOTE.E4, NOTE.G4],            type: 'tetrad'},
+        { name: 'Dreamy D',      notes: [NOTE.D4, NOTE.A4, NOTE.D5, NOTE.Gb5],           type: 'tetrad'},
+        // 5-звучные
+        { name: 'Cmaj9 5',       notes: [NOTE.C3, NOTE.G3, NOTE.E4, NOTE.G4, NOTE.B4],  type: 'pentatonic'},
+        { name: 'Dreamy 5',      notes: [NOTE.G3,NOTE.D4,NOTE.G4,NOTE.A4,NOTE.B4],      type: 'pentatonic'},
+        // 6-звучные
+        { name: 'Serene 6',      notes: [NOTE.C3,NOTE.G3,NOTE.E4,NOTE.G4,NOTE.B4,NOTE.D5], type:'extended'},
+      ],
+    };
+
+    // Словарь цветов настроений
+    const MOOD_COLORS = {
+      sad:     '#4488ff', tense:   '#ff4444', happy:   '#ffcc00',
+      tender:  '#ff99cc', scary:   '#aa00ff', epic:    '#ff6600',
+      mystery: '#00ffcc', calm:    '#88ffaa', neutral: '#aaaaaa'
+    };
+
+    // Инициализация AudioContext по первому касанию/клику
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      soundEnabled = true;
+      console.log('🎵 Звуковая система активирована');
+      // Играем вводный аккорд
+      playChord('calm', 0);
+    }
+
+    document.addEventListener('pointerdown', initAudio, { once: true });
+    document.addEventListener('keydown', initAudio, { once: true });
+
+    // ── Синтез одного тона ────────────────────────────────────────────────────
+    function playTone(frequency, startTime, duration, gainValue, waveform = 'sine', fadeIn = 0.01, fadeOut = 0.3) {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      // Лёгкое вибрато для живости
+      const vibrato = audioCtx.createOscillator();
+      const vibratoGain = audioCtx.createGain();
+      vibrato.frequency.value = 5.5;
+      vibratoGain.gain.value = frequency * 0.003;
+      vibrato.connect(vibratoGain);
+      vibratoGain.connect(osc.frequency);
+      vibrato.start(startTime);
+      vibrato.stop(startTime + duration + 0.1);
+
+      osc.type = waveform;
+      osc.frequency.value = frequency;
+
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(gainValue, startTime + fadeIn);
+      gain.gain.setValueAtTime(gainValue, startTime + duration - fadeOut);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+      osc.connect(gain);
+
+      // Лёгкая реверберация через задержку
+      const delay = audioCtx.createDelay(0.5);
+      const delayGain = audioCtx.createGain();
+      delay.delayTime.value = 0.22;
+      delayGain.gain.value = 0.18;
+      gain.connect(delay);
+      delay.connect(delayGain);
+      delayGain.connect(audioCtx.destination);
+      gain.connect(audioCtx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.05);
+    }
+
+    // ── Воспроизведение аккорда ───────────────────────────────────────────────
+    function playChord(moodName, arpeggio = 0) {
+      if (!audioCtx || !soundEnabled) return;
+      const moodChords = CHORD_LIBRARY[moodName];
+      if (!moodChords || moodChords.length === 0) return;
+
+      const chord = moodChords[Math.floor(Math.random() * moodChords.length)];
+      const now = audioCtx.currentTime;
+
+      // Подбор тембра по характеру
+      let waveform = 'sine';
+      let baseGain = 0.13;
+      let chordDuration = 3.5;
+      let fadeIn = 0.04;
+      let fadeOut = 0.6;
+
+      if (moodName === 'scary')   { waveform = 'sawtooth'; baseGain = 0.09; chordDuration = 4.0; fadeIn = 0.3; fadeOut = 1.2; }
+      if (moodName === 'tense')   { waveform = 'square';   baseGain = 0.07; chordDuration = 2.8; fadeIn = 0.1; fadeOut = 0.5; }
+      if (moodName === 'happy')   { waveform = 'triangle'; baseGain = 0.14; chordDuration = 2.5; fadeIn = 0.02; fadeOut = 0.4;}
+      if (moodName === 'tender')  { waveform = 'sine';     baseGain = 0.11; chordDuration = 4.5; fadeIn = 0.08; fadeOut = 1.0;}
+      if (moodName === 'epic')    { waveform = 'sawtooth'; baseGain = 0.10; chordDuration = 3.8; fadeIn = 0.05; fadeOut = 0.8;}
+      if (moodName === 'mystery') { waveform = 'sine';     baseGain = 0.10; chordDuration = 5.0; fadeIn = 0.12; fadeOut = 1.5;}
+      if (moodName === 'calm')    { waveform = 'sine';     baseGain = 0.10; chordDuration = 5.5; fadeIn = 0.1;  fadeOut = 1.8;}
+      if (moodName === 'sad')     { waveform = 'triangle'; baseGain = 0.11; chordDuration = 4.2; fadeIn = 0.06; fadeOut = 1.2;}
+
+      // Уменьшаем громкость для расширенных аккордов
+      const gainFactor = chord.notes.length >= 6 ? 0.72 : chord.notes.length >= 5 ? 0.82 : 1.0;
+
+      chord.notes.forEach((freq, i) => {
+        const t = now + (arpeggio > 0 ? i * arpeggio : 0);
+        // Небольшая детюнировка для "живости"
+        const detune = (Math.random() - 0.5) * 1.2;
+        const g = (baseGain * gainFactor) / Math.sqrt(chord.notes.length);
+        playTone(freq * (1 + detune / 1000), t, chordDuration, g, waveform, fadeIn, fadeOut);
+      });
+
+      // Обновляем индикатор настроения
+      updateMoodIndicator(moodName, chord);
+    }
+
+    // ── Индикатор настроения ──────────────────────────────────────────────────
+    const moodUI = document.createElement('div');
+    moodUI.style.cssText = `
+      position:fixed; top:15px; right:15px; z-index:30;
+      background:rgba(10,10,20,0.6); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.15); border-radius:20px;
+      padding:6px 14px; color:white; font-size:13px;
+      font-family:'Segoe UI',system-ui,sans-serif; pointer-events:none;
+      transition: border-color 0.5s, color 0.5s;
+      display:flex; align-items:center; gap:8px; min-width:160px;
+    `;
+    moodUI.innerHTML = `<span id="moodDot" style="width:10px;height:10px;border-radius:50%;background:#aaa;display:inline-block;box-shadow:0 0 8px #aaa"></span>
+      <span id="moodText">🔇 Нажми для звука</span>`;
+    document.body.appendChild(moodUI);
+
+    function updateMoodIndicator(moodName, chord) {
+      const color = MOOD_COLORS[moodName] || '#aaa';
+      const dot = document.getElementById('moodDot');
+      const txt = document.getElementById('moodText');
+      if (!dot || !txt) return;
+
+      const moodNames = {
+        sad:'😢 Грустный', tense:'😰 Тревожный', happy:'😄 Весёлый',
+        tender:'🌸 Нежный', scary:'😱 Страшный', epic:'⚡ Эпический',
+        mystery:'🌙 Таинственный', calm:'🌿 Спокойный'
+      };
+      dot.style.background = color;
+      dot.style.boxShadow = `0 0 10px ${color}`;
+      txt.textContent = `${moodNames[moodName] || moodName} · ${chord.type}`;
+      moodUI.style.borderColor = color + '88';
+    }
+
+    // ── Логика смены настроения ───────────────────────────────────────────────
+    // Настроение зависит от состояния игры
+    function selectMood() {
+      if (health < 20) return 'scary';
+      if (health < 40) return 'tense';
+      if (fuel < 15) return 'sad';
+      if (state.up && fuel > 50) return 'epic';
+      if (state.shooting) return 'tense';
+      if (health > 85 && fuel > 85) return 'happy';
+      if (fuel < 30) return 'mystery';
+      if (health > 70 && !state.forward && !state.up) return 'calm';
+      if (state.forward) {
+        const r = Math.random();
+        return r < 0.3 ? 'epic' : r < 0.6 ? 'happy' : 'mystery';
+      }
+      // Случайный выбор из разных настроений
+      const moods = ['sad','tense','happy','tender','scary','epic','mystery','calm'];
+      return moods[Math.floor(Math.random() * moods.length)];
+    }
+
+    // ── Главный игровой звуковой тик ─────────────────────────────────────────
+    // Вызывается из animate()
+    function updateSound(now, dt) {
+      if (!soundEnabled || gameOver) return;
+
+      moodTimer += dt;
+      const interval = currentMood === 'calm' ? 6.0
+                     : currentMood === 'mystery' ? 5.0
+                     : currentMood === 'scary' ? 3.2
+                     : currentMood === 'tense' ? 3.5
+                     : currentMood === 'epic' ? 3.0
+                     : 4.0;
+
+      if (moodTimer >= interval) {
+        moodTimer = 0;
+        currentMood = selectMood();
+        // Арпеджио для весёлых и эпических, блок для остальных
+        const arpRate = (currentMood === 'happy' || currentMood === 'epic') ? 0.06
+                      : (currentMood === 'mystery') ? 0.12
+                      : 0;
+        playChord(currentMood, arpRate);
+      }
+
+      // Специальные звуковые события
+      if (state.shooting && Math.random() < dt * 3) {
+        // Быстрый диссонансный акцент при стрельбе
+        if (audioCtx) {
+          const t = audioCtx.currentTime;
+          playTone(NOTE.Eb5 * (0.95 + Math.random() * 0.1), t, 0.18, 0.08, 'square', 0.005, 0.1);
+        }
+      }
+
+      if (state.up && fuel > 0 && Math.random() < dt * 1.5) {
+        // Нарастающий тон полёта
+        if (audioCtx) {
+          const t = audioCtx.currentTime;
+          const f = 80 + (100 - fuel) * 1.5;
+          playTone(f, t, 0.4, 0.05, 'sawtooth', 0.02, 0.35);
+        }
+      }
+    }
+
+    // ─────────────────────────────────────
+    requestAnimationFrame(animate);
+    console.log('🚀 Реактивный бегущий человечек готов! L - жизнь, F - топливо, W - оружие, кнопка ВНИЗ - огонь.');
+  </script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('SW зарегистрирован!', reg))
+        .catch(err => console.log('Ошибка SW:', err));
+    });
+  }
+</script>
+</body>
+</html>
+```
